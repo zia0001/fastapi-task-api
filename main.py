@@ -39,6 +39,7 @@ tasks = [
 
 
 
+# Root endpoint: Returns basic information about the Task API
 @app.get("/")
 def root():
     return {
@@ -48,17 +49,21 @@ def root():
     }
 
 
+# Health check endpoint: Confirms that the API server is running
 @app.get("/health")
 def health():
     return {
         "status": "ok"
     }
     
+
+# Get all tasks: Returns the complete list of tasks
 @app.get("/tasks")
 def get_tasks():
     return tasks
 
 
+# Get single task: Returns a task by ID, or 404 if not found
 @app.get("/tasks/{task_id}")
 def get_task(task_id: int):
 
@@ -71,6 +76,8 @@ def get_task(task_id: int):
         detail=f"Task {task_id} not found"
     )
     
+
+# Create task: Adds a new task with validation and returns status code 201
 @app.post("/tasks", status_code=201)
 def create_task(task: TaskCreate):
 
@@ -91,6 +98,7 @@ def create_task(task: TaskCreate):
     return new_task
 
 
+# Update task: Updates title and/or completion status of an existing task
 @app.put("/tasks/{task_id}")
 def update_task(task_id: int, updated_task: TaskUpdate):
 
@@ -119,6 +127,7 @@ def update_task(task_id: int, updated_task: TaskUpdate):
     )
     
     
+# Delete task: Removes a task by ID and returns status code 204
 @app.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int):
 
