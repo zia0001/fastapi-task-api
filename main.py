@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
+from database import create_table, seed_tasks
+
 
 
 app = FastAPI(
@@ -8,6 +10,10 @@ app = FastAPI(
     description="Simple CRUD API for managing tasks.",
     version="1.0"
 )
+
+create_table()
+
+seed_tasks()
 
 
 
