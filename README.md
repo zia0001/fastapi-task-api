@@ -494,28 +494,4 @@ This proves that the application can switch its persistence layer without changi
 
 **Zia Uddin**
 
-GitHub: https://github.com/zia0001
 
-````
-
-### One important correction
-
-Your old README included `tasks.db`. **Remove that from the A3 project structure**. Your A3 database is PostgreSQL now, so `tasks.db` is no longer part of the application's storage.
-
-Also make sure you **do not commit `.env`**. Only `.env.example` should go to GitHub.
-
-After replacing the README:
-
-```bash
-git status
-````
-
-Then:
-
-```bash
-git add README.md database.py main.py requirements.txt Dockerfile docker-compose.yml init.sql .dockerignore .env.example screenshots/
-git commit -m "A3: containerize FastAPI with PostgreSQL"
-git push origin main
-```
-
-Then your GitHub repository is ready to submit as the A3 proof.
