@@ -1,0 +1,36 @@
+services:
+
+  postgres:
+    image: postgres:18
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - task-api-postgres-data:/var/lib/postgresql
+
+    ports:
+      - "5433:5432"
+
+  app:
+    build: .
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      - postgres
+
+
+volumes:
+  task-api-postgres-data:
+    external: true

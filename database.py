@@ -1,31 +1,33 @@
-import sqlite3
-
-DATABASE_NAME = "tasks.db"
-
-
 import os
-import sqlite3
 
-DATABASE_NAME = "tasks.db"
+import psycopg
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 def get_connection():
-
-    connection = sqlite3.connect(DATABASE_NAME)
-    connection.row_factory = sqlite3.Row
-    return connection
+    return psycopg.connect(
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT"),
+        dbname=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD"),
+    )
 
 
 def create_table():
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            done BOOLEAN NOT NULL
-        )
-    """)
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                done BOOLEAN NOT NULL DEFAULT FALSE
+            )
+        """)
 
     connection.commit()
     connection.close()
@@ -33,23 +35,23 @@ def create_table():
 
 def seed_tasks():
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute("SELECT COUNT(*) FROM tasks")
-    count = cursor.fetchone()[0]
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(*) FROM tasks")
+        count = cursor.fetchone()[0]
 
-    if count == 0:
-        cursor.executemany(
-            """
-            INSERT INTO tasks (title, done)
-            VALUES (?, ?)
-            """,
-            [
-                ("Study FastAPI", False),
-                ("Buy groceries", True),
-                ("Complete assignment", False)
-            ]
-        )
+        if count == 0:
+            cursor.executemany(
+                """
+                INSERT INTO tasks (title, done)
+                VALUES (%s, %s)
+                """,
+                [
+                    ("Study FastAPI", False),
+                    ("Buy groceries", True),
+                    ("Complete assignment", False),
+                ],
+            )
 
     connection.commit()
     connection.close()
@@ -57,109 +59,126 @@ def seed_tasks():
 
 def get_all_tasks():
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute("SELECT * FROM tasks")
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, title, done FROM tasks ORDER BY id"
+        )
 
-    rows = cursor.fetchall()
+        rows = cursor.fetchall()
 
     connection.close()
 
-    return [dict(row) for row in rows]
+    return [
+        {
+            "id": row[0],
+            "title": row[1],
+            "done": row[2],
+        }
+        for row in rows
+    ]
 
 
 def get_task_by_id(task_id: int):
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (task_id,)
-    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT id, title, done
+            FROM tasks
+            WHERE id = %s
+            """,
+            (task_id,),
+        )
 
-    row = cursor.fetchone()
+        row = cursor.fetchone()
 
     connection.close()
 
     if row is None:
         return None
 
-    return dict(row)
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": row[2],
+    }
 
 
 def create_task(title: str):
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute(
-        """
-        INSERT INTO tasks (title, done)
-        VALUES (?, ?)
-        """,
-        (title, False)
-    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            INSERT INTO tasks (title, done)
+            VALUES (%s, %s)
+            RETURNING id, title, done
+            """,
+            (title, False),
+        )
+
+        row = cursor.fetchone()
 
     connection.commit()
-
-    task_id = cursor.lastrowid
-
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (task_id,)
-    )
-
-    row = cursor.fetchone()
-
     connection.close()
 
-    return dict(row)
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": row[2],
+    }
+
+
+
+def update_task(task_id: int, title=None, done=None):
+    connection = get_connection()
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            UPDATE tasks
+            SET
+                title = COALESCE(%s, title),
+                done = COALESCE(%s, done)
+            WHERE id = %s
+            RETURNING id, title, done
+            """,
+            (title, done, task_id),
+        )
+
+        row = cursor.fetchone()
+
+    connection.commit()
+    connection.close()
+
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "title": row[1],
+        "done": row[2],
+    }
 
 
 def delete_task(task_id: int):
     connection = get_connection()
-    cursor = connection.cursor()
 
-    cursor.execute(
-        "DELETE FROM tasks WHERE id = ?",
-        (task_id,)
-    )
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """
+            DELETE FROM tasks
+            WHERE id = %s
+            RETURNING id
+            """,
+            (task_id,),
+        )
 
-    deleted = cursor.rowcount
+        row = cursor.fetchone()
 
     connection.commit()
     connection.close()
 
-    return deleted
-
-def update_task(task_id: int, title=None, done=None):
-    connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        UPDATE tasks
-        SET title = COALESCE(?, title),
-            done = COALESCE(?, done)
-        WHERE id = ?
-        """,
-        (title, done, task_id)
-    )
-
-    updated = cursor.rowcount
-
-    connection.commit()
-
-    if updated == 0:
-        connection.close()
-        return None
-
-    cursor.execute(
-        "SELECT * FROM tasks WHERE id = ?",
-        (task_id,)
-    )
-
-    row = cursor.fetchone()
-
-    connection.close()
-
-    return dict(row)
+    return row is not None

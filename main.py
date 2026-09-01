@@ -6,9 +6,9 @@ from database import (
     seed_tasks,
     get_all_tasks,
     get_task_by_id,
-    create_task as db_create_task,
-    delete_task as db_delete_task,
-    update_task as db_update_task,
+    create_task,
+    update_task,
+    delete_task,
 )
 
 
@@ -77,7 +77,7 @@ def get_task(task_id: int):
 
 # Create task: Adds a new task with validation and returns status code 201
 @app.post("/tasks", status_code=201)
-def create_task(task: TaskCreate):
+def create_task_endpoint(task: TaskCreate):
 
     if task.title.strip() == "":
         raise HTTPException(
@@ -85,25 +85,24 @@ def create_task(task: TaskCreate):
             detail="Title is required"
         )
 
-    return db_create_task(task.title)
+    return create_task(task.title)
 
 
 # Update task: Updates title and/or completion status of an existing task
 @app.put("/tasks/{task_id}")
-def update_task(task_id: int, updated_task: TaskUpdate):
+def update_task_endpoint(task_id: int, updated_task: TaskUpdate):
 
     if updated_task.title is not None:
-
         if updated_task.title.strip() == "":
             raise HTTPException(
                 status_code=400,
                 detail="Title is required"
             )
 
-    task = db_update_task(
+    task = update_task(
         task_id,
-        updated_task.title,
-        updated_task.done
+        title=updated_task.title,
+        done=updated_task.done
     )
 
     if task is None:
@@ -116,11 +115,11 @@ def update_task(task_id: int, updated_task: TaskUpdate):
     
 # Delete task: Removes a task by ID and returns status code 204
 @app.delete("/tasks/{task_id}", status_code=204)
-def delete_task(task_id: int):
+def delete_task_endpoint(task_id: int):
 
-    deleted = db_delete_task(task_id)
+    deleted = delete_task(task_id)
 
-    if deleted == 0:
+    if not deleted:
         raise HTTPException(
             status_code=404,
             detail=f"Task {task_id} not found"

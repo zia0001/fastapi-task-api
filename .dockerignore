@@ -1,0 +1,11 @@
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.env
+tasks.db
+*.db-journal
+screenshots/
+test_db.py
+test_postgres.py
