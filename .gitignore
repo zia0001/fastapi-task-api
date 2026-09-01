@@ -39,3 +39,6 @@ dist/
 *.db-journal
 *.db-wal
 *.db-shm
+# Editor temporary files
+*.swp
+*.swo
