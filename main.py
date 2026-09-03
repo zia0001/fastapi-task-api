@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
 from typing import Optional
+from auth import AuthRequest
+from supabase_client import supabase
 from database import (
     create_table,
     seed_tasks,
@@ -52,6 +54,30 @@ def health():
     return {
         "status": "ok"
     }
+@app.post("/auth/signup", status_code=201)
+def signup(auth_data: AuthRequest):
+    if not auth_data.email or not auth_data.password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    try:
+        response = supabase.auth.sign_up({
+            "email": auth_data.email,
+            "password": auth_data.password
+        })
+
+        return {
+            "message": "User created successfully",
+            "user": {
+                "id": response.user.id,
+                "email": response.user.email
+            }
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
     
 
 # Get all tasks: Returns all tasks in the database as a list of dictionaries
