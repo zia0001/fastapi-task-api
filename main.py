@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Request
 from pydantic import BaseModel
 from typing import Optional
 from auth import AuthRequest
@@ -54,6 +54,12 @@ def health():
     return {
         "status": "ok"
     }
+
+@app.get("/public/info")
+def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
 @app.post("/auth/signup", status_code=201)
 def signup(auth_data: AuthRequest):
     if not auth_data.email or not auth_data.password:
@@ -99,6 +105,22 @@ def login(auth_data: AuthRequest):
 
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid login credentials")
+
+
+@app.get("/protected/profile")
+def protected_profile(request: Request):
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    token = auth_header.split(" ", 1)[1].strip()
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    return {"message": "Token received (not yet verified)"}
+
     
 
 # Get all tasks: Returns all tasks in the database as a list of dictionaries
