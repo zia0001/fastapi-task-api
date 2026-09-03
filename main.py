@@ -80,6 +80,27 @@ def signup(auth_data: AuthRequest):
         )
     
 
+
+@app.post("/auth/login")
+def login(auth_data: AuthRequest):
+    if not auth_data.email or not auth_data.password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": auth_data.email,
+            "password": auth_data.password
+        })
+
+        return {
+            "access_token": response.session.access_token,
+            "refresh_token": response.session.refresh_token
+        }
+
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid login credentials")
+    
+
 # Get all tasks: Returns all tasks in the database as a list of dictionaries
 @app.get("/tasks")
 def get_tasks():
