@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Response, Request, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
 from auth import AuthRequest
@@ -21,6 +22,8 @@ app = FastAPI(
     version="1.0"
 )
 
+security = HTTPBearer(auto_error=False)
+
 create_table()
 
 seed_tasks()
@@ -35,16 +38,11 @@ class TaskUpdate(BaseModel):
     title: Optional[str] = None
     done: Optional[bool] = None
 
-def get_current_user(request: Request):
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header or not auth_header.startswith("Bearer "):
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None:
         raise HTTPException(status_code=401, detail="Access token required")
 
-    token = auth_header.split(" ", 1)[1].strip()
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Access token required")
+    token = credentials.credentials
 
     try:
         response = supabase.auth.get_user(token)
