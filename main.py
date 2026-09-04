@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Response, Request
+from fastapi import FastAPI, HTTPException, Response, Request, Depends
 from pydantic import BaseModel
 from typing import Optional
 from auth import AuthRequest
@@ -34,6 +34,28 @@ class TaskCreate(BaseModel):
 class TaskUpdate(BaseModel):
     title: Optional[str] = None
     done: Optional[bool] = None
+
+def get_current_user(request: Request):
+    auth_header = request.headers.get("Authorization")
+
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    token = auth_header.split(" ", 1)[1].strip()
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token required")
+
+    try:
+        response = supabase.auth.get_user(token)
+        user = response.user
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    return user
     
 
 
@@ -107,34 +129,26 @@ def login(auth_data: AuthRequest):
         raise HTTPException(status_code=401, detail="Invalid login credentials")
 
 
-@app.get("/protected/profile")
-def protected_profile(request: Request):
-    auth_header = request.headers.get("Authorization")
-
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Access token required")
-
-    token = auth_header.split(" ", 1)[1].strip()
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Access token required")
-
+@app.post("/auth/logout", status_code=204)
+def logout(user = Depends(get_current_user)):
     try:
-        response = supabase.auth.get_user(token)
-        user = response.user
+        supabase.auth.sign_out()
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        pass
+    return Response(status_code=204)
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
+@app.get("/protected/profile")
+def protected_profile(user = Depends(get_current_user)):
     return {
         "id": user.id,
         "email": user.email,
         "created_at": user.created_at
     }
 
-    
+
+@app.get("/protected/dashboard")
+def protected_dashboard(user = Depends(get_current_user)):
+    return {"message": f"Welcome to your dashboard, {user.email}"}
 
 # Get all tasks: Returns all tasks in the database as a list of dictionaries
 @app.get("/tasks")
