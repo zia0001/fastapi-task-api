@@ -5,6 +5,22 @@ from urllib.parse import urljoin
 from datetime import datetime, timezone
 
 
+from pydantic import BaseModel, HttpUrl
+from typing import Optional
+
+
+class Book(BaseModel):
+    title: str
+    product_url: HttpUrl
+    price_gbp: float
+    price_text: str
+    availability_text: str
+    rating_text: str
+    description: Optional[str] = None
+    source_page: str
+    fetched_at: str
+
+
 
 # Politeness config
 USER_AGENT = "FlyRankInternshipA9/1.0 (+https://github.com/zia0001/fastapi-task-api)"
@@ -39,6 +55,13 @@ def fetch_page(url: str, cache_filename: str) -> str:
     cache_path.write_text(html, encoding="utf-8")
     print(f"FETCH — {cache_filename} ({len(html)} bytes)")
     return html
+
+def clean_price(price_text: str) -> float:
+    """
+    Turn '£51.77' into 51.77
+    """
+    cleaned = price_text.replace("£", "").strip()
+    return float(cleaned)
 
 
 def extract_book(book_url: str, source_page: str, cache_filename: str) -> dict:
@@ -110,5 +133,49 @@ if __name__ == "__main__":
         if not was_cached:
             time.sleep(0.5)  # be polite — only delay for real network fetches
 
-    print(f"detail_pages={len(all_records)}")
-    print(all_records[0])
+        print(f"detail_pages={len(all_records)}")
+
+    # --- Stage 4: validate and store ---
+    import json
+
+    valid_books = []
+    errors = []
+
+    for raw in all_records:
+        try:
+            price_gbp = clean_price(raw["price_text"])
+            book = Book(
+                title=raw["title"],
+                product_url=raw["product_url"],
+                price_gbp=price_gbp,
+                price_text=raw["price_text"],
+                availability_text=raw["availability_text"],
+                rating_text=raw["rating_text"],
+                description=raw["description"],
+                source_page=raw["source_page"],
+                fetched_at=raw["fetched_at"],
+            )
+            valid_books.append(book)
+        except Exception as e:
+            errors.append({"record": raw, "reason": str(e)})
+
+    # De-duplicate by canonical URL (product_url), keep first occurrence
+    seen_urls = set()
+    unique_books = []
+    for book in valid_books:
+        url_str = str(book.product_url)
+        if url_str not in seen_urls:
+            seen_urls.add(url_str)
+            unique_books.append(book)
+
+    OUTPUT_DIR = BASE_DIR / "output"
+    OUTPUT_DIR.mkdir(exist_ok=True)
+
+    with open(OUTPUT_DIR / "books.json", "w", encoding="utf-8") as f:
+        json.dump([b.model_dump(mode="json") for b in unique_books], f, indent=2, ensure_ascii=False)
+
+    with open(OUTPUT_DIR / "errors.json", "w", encoding="utf-8") as f:
+        json.dump(errors, f, indent=2, ensure_ascii=False)
+
+    print(f"valid_records={len(unique_books)}")
+    print(f"invalid_records={len(errors)}")
